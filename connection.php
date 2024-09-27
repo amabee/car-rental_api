@@ -5,7 +5,7 @@ class DatabaseConnection
     private $server = "localhost";
     private $user = "admindatabase";
     private $password = "password";
-    private $database = "quickie_db";
+    private $database = "car-rental";
 
     private static $instance = null;
 
