@@ -5,7 +5,7 @@ header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 include('../connection.php');
 
-class Auth
+class CustomerAuth
 {
     private $conn;
 
@@ -88,8 +88,8 @@ class Auth
     }
 }
 
-// Initialize the Auth class
-$auth = new Auth();
+// Initialize the CustomerAuth class
+$customerAuth = new CustomerAuth();
 
 if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST") {
     if (isset($_REQUEST["operation"]) && isset($_REQUEST["json"])) {
@@ -98,11 +98,11 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST")
 
         switch ($operation) {
             case "login":
-                echo $auth->login($json);
+                echo $customerAuth->login($json);
                 break;
 
             case "signup":
-                echo $auth->signup($json);
+                echo $customerAuth->signup($json);
                 break;
 
             default:
