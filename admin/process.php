@@ -31,7 +31,7 @@ class AdminProc
         // Handle image upload
         if (isset($_FILES['car_image']) && $_FILES['car_image']['error'] == 0) {
             $imageName = $_FILES['car_image']['name'];
-            $targetDir = 'Car_Image/';
+            $targetDir = '../CAR_IMAGES/';
             $targetFile = $targetDir . basename($imageName);
 
             // Check if image is a valid image
@@ -73,13 +73,34 @@ class AdminProc
     // Read all cars
     public function readCars()
     {
-        $query = "SELECT car_id, make, model, year, license_plate, price_per_day, status, created_at FROM cars";
+        $query = "SELECT car_id, make, model, year, license_plate, price_per_day, status, car_image, created_at FROM cars";
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $cars = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return json_encode($cars);
+        return json_encode(["success" => $cars]);
     }
+
+    public function getAvailableCars()
+    {
+        $query = "SELECT car_id, make, model, year, license_plate, price_per_day, status, car_image, created_at FROM cars WHERE status = 'available'";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $cars = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return json_encode(["success" => $cars]);
+    }
+
+    public function getListOfUsers()
+    {
+        $query = "SELECT `customer_id`, `first_name`, `last_name`, `email`,`phone`, `driver_license` FROM `customers` WHERE 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return json_encode(["success" => $users]);
+    }
+
 
     // Read a single car
     public function readCar($json)
@@ -164,7 +185,6 @@ class AdminProc
         }
     }
 
-
     // Delete a car
     public function deleteCar($json)
     {
@@ -187,6 +207,8 @@ class AdminProc
         }
     }
 
+
+
     // CRUD for Bookings
 
     // Create new booking
@@ -200,9 +222,11 @@ class AdminProc
         $rentalEnd = $data['rental_end'];
         $totalPrice = $data['total_price'];
         $status = $data['status'];
+        $booking_source = $data['booking_source'];
 
-        $insertQuery = "INSERT INTO bookings (car_id, customer_id, rental_start, rental_end, total_price, status) 
-                        VALUES (:car_id, :customer_id, :rental_start, :rental_end, :total_price, :status)";
+        // Insert booking into the database
+        $insertQuery = "INSERT INTO bookings (car_id, customer_id, rental_start, rental_end, total_price, status, booking_source) 
+                        VALUES (:car_id, :customer_id, :rental_start, :rental_end, :total_price, :status, :booking_source)";
         $stmt = $this->conn->prepare($insertQuery);
         $stmt->bindParam(':car_id', $carId, PDO::PARAM_INT);
         $stmt->bindParam(':customer_id', $customerId, PDO::PARAM_INT);
@@ -210,8 +234,15 @@ class AdminProc
         $stmt->bindParam(':rental_end', $rentalEnd, PDO::PARAM_STR);
         $stmt->bindParam(':total_price', $totalPrice, PDO::PARAM_STR);
         $stmt->bindParam(':status', $status, PDO::PARAM_STR);
+        $stmt->bindParam(':booking_source', $booking_source, PDO::PARAM_STR);
 
         if ($stmt->execute()) {
+            // Update the car status to "rented"
+            $updateCarStatusQuery = "UPDATE cars SET status = 'rented' WHERE car_id = :car_id";
+            $updateStmt = $this->conn->prepare($updateCarStatusQuery);
+            $updateStmt->bindParam(':car_id', $carId, PDO::PARAM_INT);
+            $updateStmt->execute(); // Execute the update
+
             return json_encode(array("success" => "Booking created successfully"));
         } else {
             return json_encode(array("error" => "Failed to create booking"));
@@ -221,13 +252,30 @@ class AdminProc
     // Read all bookings
     public function readBookings()
     {
-        $query = "SELECT booking_id, car_id, customer_id, rental_start, rental_end, total_price, status, created_at FROM bookings";
+        $query = "SELECT 
+                    bookings.booking_id, 
+                    bookings.car_id, 
+                    bookings.customer_id, 
+                    bookings.rental_start, 
+                    bookings.rental_end, 
+                    bookings.total_price, 
+                    bookings.status, 
+                    bookings.created_at,
+                    customers.first_name, 
+                    customers.last_name, 
+                    customers.email, 
+                    customers.phone, 
+                    customers.driver_license 
+                  FROM bookings
+                  JOIN customers ON bookings.customer_id = customers.customer_id";
+
         $stmt = $this->conn->prepare($query);
         $stmt->execute();
         $bookings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return json_encode($bookings);
+        return json_encode(array("success" => $bookings));
     }
+
 
     // Read a single booking
     public function readBooking($bookingId)
@@ -239,38 +287,59 @@ class AdminProc
         $booking = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($booking) {
-            return json_encode($booking);
+            return json_encode(array("success" => $booking));
         } else {
             return json_encode(array("error" => "Booking not found"));
         }
     }
 
     // Update booking information
-    public function updateBooking($bookingId, $json)
+    public function updateBooking($json)
     {
         $data = json_decode($json, true);
-
-        $carId = $data['car_id'];
-        $customerId = $data['customer_id'];
-        $rentalStart = $data['rental_start'];
-        $rentalEnd = $data['rental_end'];
-        $totalPrice = $data['total_price'];
         $status = $data['status'];
+        $bookingId = $data['booking_id'];
 
-        $updateQuery = "UPDATE bookings SET car_id = :car_id, customer_id = :customer_id, rental_start = :rental_start, rental_end = :rental_end, total_price = :total_price, status = :status WHERE booking_id = :booking_id";
-        $stmt = $this->conn->prepare($updateQuery);
-        $stmt->bindParam(':car_id', $carId, PDO::PARAM_INT);
-        $stmt->bindParam(':customer_id', $customerId, PDO::PARAM_INT);
-        $stmt->bindParam(':rental_start', $rentalStart, PDO::PARAM_STR);
-        $stmt->bindParam(':rental_end', $rentalEnd, PDO::PARAM_STR);
-        $stmt->bindParam(':total_price', $totalPrice, PDO::PARAM_STR);
-        $stmt->bindParam(':status', $status, PDO::PARAM_STR);
-        $stmt->bindParam(':booking_id', $bookingId, PDO::PARAM_INT);
+        // Start a transaction
+        $this->conn->beginTransaction();
 
-        if ($stmt->execute()) {
+        try {
+            // Update the booking status
+            $updateQuery = "UPDATE bookings SET status = :status WHERE booking_id = :booking_id";
+            $stmt = $this->conn->prepare($updateQuery);
+            $stmt->bindParam(':status', $status, PDO::PARAM_STR);
+            $stmt->bindParam(':booking_id', $bookingId, PDO::PARAM_INT);
+
+            if (!$stmt->execute()) {
+                throw new Exception("Failed to update booking");
+            }
+
+            // Get the car_id from the booking
+            $carQuery = "SELECT car_id FROM bookings WHERE booking_id = :booking_id";
+            $carStmt = $this->conn->prepare($carQuery);
+            $carStmt->bindParam(':booking_id', $bookingId, PDO::PARAM_INT);
+            $carStmt->execute();
+            $carId = $carStmt->fetchColumn();
+
+            if ($status === 'completed' || $status === 'canceled') {
+                $updateCarQuery = "UPDATE cars SET status = 'available' WHERE car_id = :car_id";
+                $carStmt = $this->conn->prepare($updateCarQuery);
+                $carStmt->bindParam(':car_id', $carId, PDO::PARAM_INT);
+
+                if (!$carStmt->execute()) {
+                    throw new Exception("Failed to update car status");
+                }
+            }
+
+            // Commit the transaction
+            $this->conn->commit();
+
             return json_encode(array("success" => "Booking updated successfully"));
-        } else {
-            return json_encode(array("error" => "Failed to update booking"));
+
+        } catch (Exception $e) {
+            // Rollback the transaction if an error occurred
+            $this->conn->rollBack();
+            return json_encode(array("error" => $e->getMessage()));
         }
     }
 
@@ -307,6 +376,14 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST" 
                 echo $adminProc->readCars();
                 break;
 
+            case "getAvailableCars":
+                echo $adminProc->getAvailableCars();
+                break;
+
+            case "getListOfUsers":
+                echo $adminProc->getListOfUsers();
+                break;
+
             case "getCar":
                 echo $adminProc->readCar($json);
                 break;
@@ -337,11 +414,7 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST" 
                 break;
 
             case "updateBooking":
-                if (isset($_REQUEST["booking_id"])) {
-                    echo $adminProc->updateBooking($_REQUEST["booking_id"], $json);
-                } else {
-                    echo json_encode(array("error" => "Missing booking_id parameter"));
-                }
+                echo $adminProc->updateBooking($json);
                 break;
 
             case "deleteBooking":
