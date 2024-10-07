@@ -356,6 +356,37 @@ class AdminProc
             return json_encode(array("error" => "Failed to delete booking"));
         }
     }
+
+    public function getIncomeAndBookings()
+    {
+        // Current year and month
+        $currentYear = date('Y');
+        $currentMonth = date('m');
+
+        // Query to get the total bookings, annual income, monthly income, number of cars, and cars under maintenance
+        $query = "
+        SELECT 
+            (SELECT IFNULL(SUM(total_price), 0) FROM bookings WHERE YEAR(rental_start) = :currentYear) AS annual_income,
+            (SELECT IFNULL(SUM(total_price), 0) FROM bookings WHERE YEAR(rental_start) = :currentYear AND MONTH(rental_start) = :currentMonth) AS monthly_income,
+            (SELECT COUNT(booking_id) FROM bookings WHERE YEAR(rental_start) = :currentYear) AS total_bookings,
+            (SELECT COUNT(car_id) FROM cars) AS total_cars,
+            (SELECT COUNT(car_id) FROM cars WHERE status = 'maintenance') AS cars_under_maintenance
+    ";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':currentYear', $currentYear, PDO::PARAM_INT);
+        $stmt->bindParam(':currentMonth', $currentMonth, PDO::PARAM_INT);
+
+        if ($stmt->execute()) {
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return json_encode(array("success" => $result));
+        } else {
+            return json_encode(array("error" => "Failed to retrieve data"));
+        }
+    }
+
+
+
 }
 
 // Initialize the AdminProc class
@@ -405,25 +436,15 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST" 
                 echo $adminProc->readBookings();
                 break;
 
-            case "readBooking":
-                if (isset($_REQUEST["booking_id"])) {
-                    echo $adminProc->readBooking($_REQUEST["booking_id"]);
-                } else {
-                    echo json_encode(array("error" => "Missing booking_id parameter"));
-                }
-                break;
-
             case "updateBooking":
                 echo $adminProc->updateBooking($json);
                 break;
 
-            case "deleteBooking":
-                if (isset($_REQUEST["booking_id"])) {
-                    echo $adminProc->deleteBooking($_REQUEST["booking_id"]);
-                } else {
-                    echo json_encode(array("error" => "Missing booking_id parameter"));
-                }
+            case "getIncomeAndBookings":
+                echo $adminProc->getIncomeAndBookings();
                 break;
+
+
 
             default:
                 echo json_encode(array("error" => "No such operation here"));
