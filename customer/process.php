@@ -128,6 +128,34 @@ class CustomerProcess
         return json_encode(["success" => $bookings]);
     }
 
+    public function getUserProfile($json)
+    {
+        $data = json_decode($json, true);
+
+        if (!isset($data['customer_id'])) {
+            return json_encode(array("error" => "Invalid User ID"));
+        }
+
+        $customer_id = $data['customer_id'];
+
+        try {
+            $sql = "SELECT `customer_id`, `first_name`, `last_name`, `email`, `phone`, `driver_license` FROM `customers` WHERE customer_id = :customer_id";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bindParam(":customer_id", $customer_id);
+            $stmt->execute();
+
+            $userProfile = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($userProfile) {
+                return json_encode(array("success" => $userProfile));
+            } else {
+                return json_encode(array("error" => "User not found"));
+            }
+        } catch (PDOException $e) {
+            return json_encode(array("error" => "Exception Error Caught: " . $e->getMessage()));
+        }
+    }
+
 
 }
 
@@ -155,6 +183,11 @@ if ($_SERVER["REQUEST_METHOD"] == "GET" || $_SERVER["REQUEST_METHOD"] == "POST")
             case "getMyBookings":
                 echo $customerProcess->getMyBookings($json);
                 break;
+
+            case "getUserProfile":
+                echo $customerProcess->getUserProfile($json);
+                break;
+
             default:
                 echo json_encode(array("error" => "No such operation here"));
                 break;
